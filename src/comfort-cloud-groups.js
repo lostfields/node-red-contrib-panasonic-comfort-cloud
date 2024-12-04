@@ -40,5 +40,6 @@ module.exports = function (RED) {
             }
         });
     }
+
     RED.nodes.registerType("pcc-groups", ComfortCloudGroups);
-}
+};

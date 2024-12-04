@@ -1,6 +1,5 @@
 // import { Device, Group, ComfortCloudClient } from 'panasonic-comfort-cloud-client';
 const {
-    ComfortCloudClient,
     Power,
     AirSwingLR,
     AirSwingUD,
@@ -11,6 +10,7 @@ const {
     NanoeMode,
     InsideCleaning
 } = require('panasonic-comfort-cloud-client');
+const { handleError, getClient } = require('./tools');
 
 const { validatePayload } = require('./lib/util');
 
