@@ -1,5 +1,5 @@
 const { ComfortCloudClient } = require('panasonic-comfort-cloud-client');
-const { gettersToJson } = require('./util');
+const { Device } = require('./device');
 
 class Client extends ComfortCloudClient {
     _RED = null
@@ -48,10 +48,13 @@ class Client extends ComfortCloudClient {
 
             await super.login(credentials?.username, credentials?.password, credentials?.refreshToken);
 
-            credentials.accessToken = this.oauthClient.token;
-            credentials.refreshToken = this.oauthClient.tokenRefresh;
+            const newCredentials = {
+                ...credentials,
+                accessToken: this.oauthClient.token,
+                refreshToken: this.oauthClient.tokenRefresh
+            }
 
-            this._RED.nodes.addCredentials(this._configKey, credentials);
+            this._RED.nodes.addCredentials(this._configKey, newCredentials);
         } finally {
             this._releaseLock();
         }        
@@ -59,11 +62,18 @@ class Client extends ComfortCloudClient {
     
     async getGroups() {
         if(!this.isAuthenticated)
-            await this.login()
+            await this.login();
         
-        const groups = await super.getGroups();
+        const groups = [];
+        for (const group of await super.getGroups()) {
+            groups.push({
+                id: group.id,
+                name: group.name,
+                devices: group.devices.map(device => new Device(device.guid, device.name, device))
+            });
+        }
 
-        return groups.map(gettersToJson);
+        return groups;
     }
 
     async getDevice(deviceId, name) {
@@ -72,7 +82,26 @@ class Client extends ComfortCloudClient {
 
         const device = await super.getDevice(deviceId, name);
 
-        return gettersToJson(device);
+        return new Device(device.guid, device.name, {
+            guid: device.guid,
+            name: device.name,
+            operate: device.operate,
+            operationMode: device.operationMode,
+            temperatureSet: device.temperatureSet,
+            fanSpeed: device.fanSpeed,
+            fanAutoMode: device.fanAutoMode,
+            airSwingLR: device.airSwingLR,
+            airSwingUD: device.airSwingUD,
+            ecoMode: device.ecoMode,
+            ecoNavi: device.ecoNavi,
+            nanoe: device.nanoe,
+            iAuto: device.iAuto,
+            actualNanoe: device.actualNanoe,
+            airDirection:  device.airDirection,
+            ecoFunctionData: device.ecoFunctionData,
+            insideTemperature: device.insideTemperature,
+            outTemperature: device.outTemperature
+        });
     }
 
     async setParameters(deviceId, parameters) {
@@ -86,6 +115,40 @@ class Client extends ComfortCloudClient {
         }
 
         return false
+    }
+
+    async retry(action) {
+        let retryCount = 0;
+            const maxRetry = 3;   
+
+        while (retryCount++ < maxRetry) {
+            try {
+                msg.payload = await Promise.resolve(action());
+                return msg
+            } catch (error) {
+                try {
+                    if (error.httpCode === 401) {
+                        this.login()
+                        node.log('Obtained a new access token.');
+                    } else if (error.httpCode === 403) {
+                        throw new Error(`An error ocurred while trying to get group. Check credentials: ${JSON.stringify(error)}`)                        
+                    } else {
+                        throw new Error(`An error ocurred while trying to get group: ${JSON.stringify(error)}`)
+                    }
+                } catch (loginErr) {
+                    // if (done) {
+                    //     done(loginErr);
+                    // } else {
+                    //     node.error(loginErr, msg);
+                    // }
+                    break;
+                }
+            }
+        }
+        if (retryCount >= maxRetry) {
+            // node.error('Reached max retry count ' + maxRetry + '. Please check your credentials, or read the logs for more information.')
+        }
+
     }
 
     async _acquireLock() {

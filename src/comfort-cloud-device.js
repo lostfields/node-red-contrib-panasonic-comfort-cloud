@@ -33,8 +33,9 @@ module.exports = function (RED) {
 
                 const pid = (payload.deviceId ? payload.deviceId : payload.deviceGuid);
                 const deviceId = pid ? pid : _config.deviceId;
+                const device = await CLIENT.getDevice(deviceId);
 
-                msg.payload = await CLIENT.getDevice(deviceId);
+                msg.payload = 'toJSON' in device ? device.toJSON() : device;
 
                 send(msg);
             } catch (error) {

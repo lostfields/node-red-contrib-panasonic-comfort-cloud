@@ -1,29 +1,3 @@
-function gettersToJson(instance) {
-    let proto = Object.getPrototypeOf(instance),
-        json = {},
-        hasProperties = false
-
-    for (const property of Object.getOwnPropertyNames(proto)) {
-        if (proto.hasOwnProperty(property)) {
-            const descriptor = Object.getOwnPropertyDescriptor(proto, property)
-            if (descriptor?.get) {
-                let value = descriptor?.get.call(instance)
-
-                if (value !== null && typeof value == 'object' && ('toJSON' in value))
-                    value = value.toJSON.call(value)
-
-                if (value !== undefined) {
-                    json[property] = value
-                    
-                    hasProperties = true
-                }
-            }
-        }
-    }
-
-    return hasProperties ? json : undefined
-}
-
 function getType(p) {
     if (Array.isArray(p)) return 'array';
     else if (typeof p == 'string') return 'string';
@@ -47,7 +21,16 @@ function validatePayload(payload) {
     return { result: false, payload, err };
 }
 
+function pick(keys, obj) {
+    return keys.reduce((acc, key) => {
+        if (obj[key] !== undefined) {
+            acc[key] = obj[key];
+        }
+        return acc;
+    }, {});
+}
+
 module.exports = {
-    gettersToJson,
-    validatePayload
+    validatePayload,
+    pick
 }
