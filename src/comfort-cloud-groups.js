@@ -1,49 +1,42 @@
-const { handleError, getClient } = require('./tools');
+// import { Device, Group, ComfortCloudClient } from 'panasonic-comfort-cloud-client';
+const { ComfortCloudClient } = require('panasonic-comfort-cloud-client');
+const { Client } = require('./lib/client');
+
+// const Tools = require('./tools');
 
 module.exports = function (RED) {
     function ComfortCloudGroups(config) {
         RED.nodes.createNode(this, config);
         const node = this;
-        const credentials = RED.nodes.getCredentials(config.comfortCloudConfig);
+        // const _config = config;
+        // const _tools = new Tools();
+
+        const global = this.context().global
+        const clientKey = `client-${config.comfortCloudConfig}`
+        if (!global.get(clientKey)) global.set(clientKey, new Client(RED, config))
+
+        const CLIENT = global.get(clientKey)
 
         node.on('input', async function (msg, send, done) {
             try {
-                // For maximum backwards compatibility, check that send exists.
-                // If this node is installed in Node-RED 0.x, it will need to
-                // fallback to using `node.send`
-                send = send || function () { node.send.apply(node, arguments) }
-
-                let client = await getClient(credentials);
-                let retryCount = 0;
-                const maxRetry = 3;
-
                 if (msg.payload === undefined || msg.payload === null || msg.payload === '') {
                     msg.payload = null;
                     send(msg);
-                    return;
                 }
 
-                while (retryCount++ < maxRetry) {
-                    try {
-                        msg.payload = await client.getGroups();
-                        send(msg);
-                        break;
-                    } catch (error) {
-                        if (error.httpCode === 401 || error.httpCode === 403 || error.httpCode === 412) {
-                            try {
-                                await client.login(credentials.username, credentials.password);
-                                node.log('Obtained a new access token.');
-                            } catch (loginError) {
-                                handleError(done, loginError, node, msg);
-                            }
-                        } else {
-                            const err = new Error(`An error ocurred while loading groups: ${JSON.stringify(error)}`)
-                            handleError(done, err, node, msg);
-                        }
-                    }
-                }
+                msg.payload = await CLIENT.getGroups();
+                send(msg);
             } catch (error) {
-                handleError(done, error, node, msg);
+                if (done) {
+                    done(error);
+                } else {
+                    node.error(error, msg);
+                }
+                return;
+            }
+
+            if (done) {
+                done();
             }
         });
     }

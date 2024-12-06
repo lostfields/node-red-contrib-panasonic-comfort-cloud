@@ -12,6 +12,9 @@ module.exports = function (RED) {
             accessToken: {
                 type: 'password',
             },
+            refreshToken: {
+                type: 'password',
+            },
             username: {
                 type: 'text',
             },
